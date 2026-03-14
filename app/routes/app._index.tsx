@@ -1,334 +1,311 @@
 import { useEffect } from "react";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { useFetcher } from "@remix-run/react";
+import type {
+  ActionFunctionArgs,
+  LoaderFunctionArgs,
+} from "@remix-run/node";
+import { json } from "@remix-run/node";
+import {
+  useActionData,
+  useLoaderData,
+  useNavigate,
+  useSubmit,
+} from "@remix-run/react";
 import {
   Page,
   Layout,
-  Text,
   Card,
-  Button,
   BlockStack,
-  Box,
-  List,
-  Link,
+  Text,
+  Badge,
+  IndexTable,
+  Button,
+  EmptyState,
   InlineStack,
 } from "@shopify/polaris";
-import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { TitleBar } from "@shopify/app-bridge-react";
+
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
+import { getReportStatus } from "../services/scheduler.server";
+import { generateReport } from "../services/report-generator.server";
+import { sendSlackReport } from "../services/slack-sender.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
-  return null;
+  const configs = await prisma.reportConfig.findMany({
+    where: { shop: session.shop },
+    orderBy: { createdAt: "desc" },
+    include: {
+      reports: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
+  });
+
+  const reports = configs.map((config) => ({
+    ...config,
+    status: getReportStatus(config),
+    validFrom: config.validFrom?.toISOString() ?? null,
+    validUntil: config.validUntil?.toISOString() ?? null,
+    lastSentAt: config.lastSentAt?.toISOString() ?? null,
+    createdAt: config.createdAt.toISOString(),
+    reports: config.reports.map((r) => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  }));
+
+  return json({ reports });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
-          }
-        }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
+  const { session, admin } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const intent = formData.get("intent") as string;
+  const configId = formData.get("configId") as string;
+
+  if (intent === "sendNow") {
+    const config = await prisma.reportConfig.findFirst({
+      where: { id: configId, shop: session.shop },
+    });
+
+    if (!config) {
+      return json({ error: "Report config not found" }, { status: 404 });
+    }
+
+    if (!config.slackWebhookUrl) {
+      return json(
+        { error: "Slack Webhook URL is not configured" },
+        { status: 400 },
+      );
+    }
+
+    try {
+      const reportData = await generateReport(
+        admin,
+        config.collectionId,
+        config.collectionTitle,
+      );
+
+      await sendSlackReport(config.slackWebhookUrl, reportData);
+
+      await prisma.reportConfig.update({
+        where: { id: configId },
+        data: { lastSentAt: new Date() },
+      });
+
+      await prisma.reportLog.create({
+        data: {
+          configId,
+          status: "success",
+          sentTo: "slack",
         },
-      },
-    },
-  );
-  const responseJson = await response.json();
+      });
 
-  const product = responseJson.data!.productCreate!.product!;
-  const variantId = product.variants.edges[0]!.node!.id!;
+      return json({ success: true, configId });
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error ? error.message : "Unknown error";
 
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyRemixTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
+      await prisma.reportLog.create({
+        data: {
+          configId,
+          status: "failed",
+          sentTo: "slack",
+          errorMsg,
+        },
+      });
 
-  const variantResponseJson = await variantResponse.json();
+      return json({ error: errorMsg }, { status: 500 });
+    }
+  }
 
-  return {
-    product: responseJson!.data!.productCreate!.product,
-    variant:
-      variantResponseJson!.data!.productVariantsBulkUpdate!.productVariants,
-  };
+  if (intent === "delete") {
+    await prisma.reportConfig.delete({
+      where: { id: configId, shop: session.shop },
+    });
+
+    return json({ deleted: true });
+  }
+
+  if (intent === "toggleActive") {
+    const config = await prisma.reportConfig.findFirst({
+      where: { id: configId, shop: session.shop },
+    });
+
+    if (config) {
+      await prisma.reportConfig.update({
+        where: { id: configId },
+        data: { isActive: !config.isActive },
+      });
+    }
+
+    return json({ toggled: true });
+  }
+
+  return json({ error: "Unknown intent" }, { status: 400 });
 };
 
-export default function Index() {
-  const fetcher = useFetcher<typeof action>();
+type StatusTone = "success" | "info" | "warning" | "critical" | undefined;
 
-  const shopify = useAppBridge();
-  const isLoading =
-    ["loading", "submitting"].includes(fetcher.state) &&
-    fetcher.formMethod === "POST";
-  const productId = fetcher.data?.product?.id.replace(
-    "gid://shopify/Product/",
-    "",
-  );
+function statusBadge(status: string) {
+  const map: Record<string, { label: string; tone: StatusTone }> = {
+    active: { label: "Active", tone: "success" },
+    pending: { label: "Pending", tone: "info" },
+    expired: { label: "Expired", tone: "warning" },
+    inactive: { label: "Inactive", tone: "critical" },
+  };
+  const { label, tone } = map[status] ?? {
+    label: status,
+    tone: undefined,
+  };
+  return <Badge tone={tone}>{label}</Badge>;
+}
+
+function scheduleLabel(schedule: string, day: number | null) {
+  switch (schedule) {
+    case "daily":
+      return "Daily";
+    case "weekly": {
+      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      return `Weekly (${days[day ?? 0]})`;
+    }
+    case "monthly":
+      return `Monthly (${day}th)`;
+    default:
+      return schedule;
+  }
+}
+
+export default function Dashboard() {
+  const { reports } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+  const navigate = useNavigate();
+  const submit = useSubmit();
 
   useEffect(() => {
-    if (productId) {
-      shopify.toast.show("Product created");
+    if (actionData && "error" in actionData) {
+      shopify.toast.show(actionData.error as string, { isError: true });
     }
-  }, [productId, shopify]);
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
+    if (actionData && "success" in actionData) {
+      shopify.toast.show("Report sent successfully!");
+    }
+    if (actionData && "deleted" in actionData) {
+      shopify.toast.show("Report deleted");
+    }
+  }, [actionData]);
+
+  const handleSendNow = (configId: string) => {
+    submit({ intent: "sendNow", configId }, { method: "post" });
+  };
+
+  const handleDelete = (configId: string) => {
+    submit({ intent: "delete", configId }, { method: "post" });
+  };
+
+  const resourceName = {
+    singular: "report",
+    plural: "reports",
+  };
+
+  const rowMarkup = reports.map((report, index) => (
+    <IndexTable.Row
+      id={report.id}
+      key={report.id}
+      position={index}
+      onClick={() => navigate(`/app/reports/${report.id}`)}
+    >
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="bold" as="span">
+          {report.collectionTitle}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        {statusBadge(report.status)}
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        {scheduleLabel(report.schedule, report.scheduleDay)} {report.scheduleTime}
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        {report.validFrom
+          ? `${report.validFrom.split("T")[0]} ~ ${report.validUntil?.split("T")[0] ?? ""}`
+          : "No limit"}
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        {report.lastSentAt
+          ? new Date(report.lastSentAt).toLocaleString("ja-JP")
+          : "-"}
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <InlineStack gap="200">
+          <Button
+            size="slim"
+            onClick={() => handleSendNow(report.id)}
+          >
+            Send Now
+          </Button>
+          <Button
+            size="slim"
+            tone="critical"
+            onClick={() => handleDelete(report.id)}
+          >
+            Delete
+          </Button>
+        </InlineStack>
+      </IndexTable.Cell>
+    </IndexTable.Row>
+  ));
 
   return (
     <Page>
-      <TitleBar title="Remix app template">
-        <button variant="primary" onClick={generateProduct}>
-          Generate a product
+      <TitleBar title="Collection Reports">
+        <button
+          variant="primary"
+          onClick={() => navigate("/app/reports/new")}
+        >
+          New Report
         </button>
       </TitleBar>
-      <BlockStack gap="500">
-        <Layout>
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="500">
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    Congrats on creating a new Shopify app 🎉
-                  </Text>
-                  <Text variant="bodyMd" as="p">
-                    This embedded app template uses{" "}
-                    <Link
-                      url="https://shopify.dev/docs/apps/tools/app-bridge"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      App Bridge
-                    </Link>{" "}
-                    interface examples like an{" "}
-                    <Link url="/app/additional" removeUnderline>
-                      additional page in the app nav
-                    </Link>
-                    , as well as an{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      Admin GraphQL
-                    </Link>{" "}
-                    mutation demo, to provide a starting point for app
-                    development.
-                  </Text>
-                </BlockStack>
-                <BlockStack gap="200">
-                  <Text as="h3" variant="headingMd">
-                    Get started with products
-                  </Text>
-                  <Text as="p" variant="bodyMd">
-                    Generate a product with GraphQL and get the JSON output for
-                    that product. Learn more about the{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      productCreate
-                    </Link>{" "}
-                    mutation in our API references.
-                  </Text>
-                </BlockStack>
-                <InlineStack gap="300">
-                  <Button loading={isLoading} onClick={generateProduct}>
-                    Generate a product
-                  </Button>
-                  {fetcher.data?.product && (
-                    <Button
-                      url={`shopify:admin/products/${productId}`}
-                      target="_blank"
-                      variant="plain"
-                    >
-                      View product
-                    </Button>
-                  )}
-                </InlineStack>
-                {fetcher.data?.product && (
-                  <>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productCreate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.product, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productVariantsBulkUpdate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.variant, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                  </>
-                )}
+      <Layout>
+        <Layout.Section>
+          <Card padding="0">
+            {reports.length === 0 ? (
+              <EmptyState
+                heading="No reports configured"
+                action={{
+                  content: "Create Report",
+                  onAction: () => navigate("/app/reports/new"),
+                }}
+                image=""
+              >
+                <p>
+                  Set up automated collection reports to send to Slack.
+                </p>
+              </EmptyState>
+            ) : (
+              <BlockStack>
+                <IndexTable
+                  resourceName={resourceName}
+                  itemCount={reports.length}
+                  headings={[
+                    { title: "Collection" },
+                    { title: "Status" },
+                    { title: "Schedule" },
+                    { title: "Period" },
+                    { title: "Last Sent" },
+                    { title: "Actions" },
+                  ]}
+                  selectable={false}
+                >
+                  {rowMarkup}
+                </IndexTable>
               </BlockStack>
-            </Card>
-          </Layout.Section>
-          <Layout.Section variant="oneThird">
-            <BlockStack gap="500">
-              <Card>
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    App template specs
-                  </Text>
-                  <BlockStack gap="200">
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Framework
-                      </Text>
-                      <Link
-                        url="https://remix.run"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Remix
-                      </Link>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Database
-                      </Text>
-                      <Link
-                        url="https://www.prisma.io/"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Prisma
-                      </Link>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Interface
-                      </Text>
-                      <span>
-                        <Link
-                          url="https://polaris.shopify.com"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          Polaris
-                        </Link>
-                        {", "}
-                        <Link
-                          url="https://shopify.dev/docs/apps/tools/app-bridge"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          App Bridge
-                        </Link>
-                      </span>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        API
-                      </Text>
-                      <Link
-                        url="https://shopify.dev/docs/api/admin-graphql"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphQL API
-                      </Link>
-                    </InlineStack>
-                  </BlockStack>
-                </BlockStack>
-              </Card>
-              <Card>
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    Next steps
-                  </Text>
-                  <List>
-                    <List.Item>
-                      Build an{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/getting-started/build-app-example"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        {" "}
-                        example app
-                      </Link>{" "}
-                      to get started
-                    </List.Item>
-                    <List.Item>
-                      Explore Shopify’s API with{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphiQL
-                      </Link>
-                    </List.Item>
-                  </List>
-                </BlockStack>
-              </Card>
-            </BlockStack>
-          </Layout.Section>
-        </Layout>
-      </BlockStack>
+            )}
+          </Card>
+        </Layout.Section>
+      </Layout>
     </Page>
   );
 }

@@ -158,10 +158,12 @@ async function fetchCollectionProducts(
 ): Promise<CollectionProduct[]> {
   const products: CollectionProduct[] = [];
   let cursor: string | null = null;
+  let hasNextPage = true;
 
-  do {
-    const response = await admin.graphql(
-      `#graphql
+  while (hasNextPage) {
+    const response: Awaited<ReturnType<typeof admin.graphql>> =
+      await admin.graphql(
+        `#graphql
       query GetCollectionProducts($collectionId: ID!, $cursor: String) {
         collection(id: $collectionId) {
           products(first: 50, after: $cursor) {
@@ -186,15 +188,16 @@ async function fetchCollectionProducts(
           }
         }
       }`,
-      {
-        variables: {
-          collectionId,
-          cursor,
+        {
+          variables: {
+            collectionId,
+            cursor,
+          },
         },
-      },
-    );
+      );
 
-    const json = await response.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json: any = await response.json();
     const collection = json.data?.collection;
     if (!collection) break;
 
@@ -213,8 +216,8 @@ async function fetchCollectionProducts(
       cursor = edge.cursor;
     }
 
-    if (!collection.products.pageInfo.hasNextPage) break;
-  } while (true);
+    hasNextPage = collection.products.pageInfo.hasNextPage;
+  }
 
   return products;
 }
@@ -226,10 +229,12 @@ async function fetchOrders(
   const orders: OrderEdge[] = [];
   let cursor: string | null = null;
   const sinceStr = since.toISOString();
+  let hasNextPage = true;
 
-  do {
-    const response = await admin.graphql(
-      `#graphql
+  while (hasNextPage) {
+    const response: Awaited<ReturnType<typeof admin.graphql>> =
+      await admin.graphql(
+        `#graphql
       query GetOrders($query: String!, $cursor: String) {
         orders(first: 50, after: $cursor, query: $query) {
           edges {
@@ -267,15 +272,16 @@ async function fetchOrders(
           }
         }
       }`,
-      {
-        variables: {
-          query: `created_at:>='${sinceStr}'`,
-          cursor,
+        {
+          variables: {
+            query: `created_at:>='${sinceStr}'`,
+            cursor,
+          },
         },
-      },
-    );
+      );
 
-    const json = await response.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json: any = await response.json();
     const ordersData = json.data?.orders;
     if (!ordersData) break;
 
@@ -283,8 +289,8 @@ async function fetchOrders(
     orders.push(...edges);
     cursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
 
-    if (!ordersData.pageInfo.hasNextPage) break;
-  } while (true);
+    hasNextPage = ordersData.pageInfo.hasNextPage;
+  }
 
   return orders;
 }

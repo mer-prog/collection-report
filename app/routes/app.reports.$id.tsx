@@ -21,6 +21,8 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { getReportStatus } from "../services/scheduler.server";
+import { useTranslation } from "../i18n/i18nContext";
+import { LanguageToggle } from "../i18n/LanguageToggle";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -99,27 +101,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   return redirect("/app");
 };
 
-const SCHEDULE_OPTIONS = [
-  { label: "Daily", value: "daily" },
-  { label: "Weekly", value: "weekly" },
-  { label: "Monthly", value: "monthly" },
-];
-
-const DAY_OF_WEEK_OPTIONS = [
-  { label: "Sunday", value: "0" },
-  { label: "Monday", value: "1" },
-  { label: "Tuesday", value: "2" },
-  { label: "Wednesday", value: "3" },
-  { label: "Thursday", value: "4" },
-  { label: "Friday", value: "5" },
-  { label: "Saturday", value: "6" },
-];
-
 export default function EditReport() {
   const { config } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   const submit = useSubmit();
+  const { t, locale } = useTranslation();
 
   const [collectionId, setCollectionId] = useState(config.collectionId);
   const [collectionTitle, setCollectionTitle] = useState(config.collectionTitle);
@@ -136,6 +123,22 @@ export default function EditReport() {
   const [validUntil, setValidUntil] = useState(config.validUntil);
   const [useValidFrom, setUseValidFrom] = useState(!!config.validFrom);
   const [useValidUntil, setUseValidUntil] = useState(!!config.validUntil);
+
+  const scheduleOptions = [
+    { label: t("schedule.daily"), value: "daily" },
+    { label: t("schedule.weekly"), value: "weekly" },
+    { label: t("schedule.monthly"), value: "monthly" },
+  ];
+
+  const dayOfWeekOptions = [
+    { label: t("schedule.sunday"), value: "0" },
+    { label: t("schedule.monday"), value: "1" },
+    { label: t("schedule.tuesday"), value: "2" },
+    { label: t("schedule.wednesday"), value: "3" },
+    { label: t("schedule.thursday"), value: "4" },
+    { label: t("schedule.friday"), value: "5" },
+    { label: t("schedule.saturday"), value: "6" },
+  ];
 
   const handleCollectionPicker = useCallback(async () => {
     const selection = await shopify.resourcePicker({
@@ -179,26 +182,30 @@ export default function EditReport() {
 
   return (
     <Page
-      backAction={{ content: "Reports", onAction: () => navigate("/app") }}
-      title={`Edit: ${config.collectionTitle}`}
+      backAction={{ content: t("common.reports"), onAction: () => navigate("/app") }}
+      title={`${t("editReport.editPrefix")}${config.collectionTitle}`}
       titleMetadata={
         <Badge tone={statusToneMap[config.status]}>
-          {config.status.charAt(0).toUpperCase() + config.status.slice(1)}
+          {t(`status.${config.status}`)}
         </Badge>
       }
     >
-      <TitleBar title="Edit Report" />
+      <TitleBar title={t("editReport.title")} />
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
+            <InlineStack align="end">
+              <LanguageToggle />
+            </InlineStack>
+
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Collection
+                  {t("reportForm.collection")}
                 </Text>
                 <InlineStack gap="300" blockAlign="center">
                   <Button onClick={handleCollectionPicker}>
-                    Change Collection
+                    {t("reportForm.changeCollection")}
                   </Button>
                   <Text as="span" variant="bodyMd">
                     {collectionTitle}
@@ -210,26 +217,26 @@ export default function EditReport() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Schedule
+                  {t("reportForm.schedule")}
                 </Text>
                 <FormLayout>
                   <Select
-                    label="Frequency"
-                    options={SCHEDULE_OPTIONS}
+                    label={t("schedule.frequency")}
+                    options={scheduleOptions}
                     value={schedule}
                     onChange={setSchedule}
                   />
                   {schedule === "weekly" && (
                     <Select
-                      label="Day of Week"
-                      options={DAY_OF_WEEK_OPTIONS}
+                      label={t("schedule.dayOfWeek")}
+                      options={dayOfWeekOptions}
                       value={scheduleDay}
                       onChange={setScheduleDay}
                     />
                   )}
                   {schedule === "monthly" && (
                     <TextField
-                      label="Day of Month"
+                      label={t("schedule.dayOfMonth")}
                       type="number"
                       value={scheduleDay}
                       onChange={setScheduleDay}
@@ -239,7 +246,7 @@ export default function EditReport() {
                     />
                   )}
                   <TextField
-                    label="Send Time"
+                    label={t("schedule.sendTime")}
                     type="time"
                     value={scheduleTime}
                     onChange={setScheduleTime}
@@ -252,17 +259,17 @@ export default function EditReport() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Validity Period
+                  {t("reportForm.validityPeriod")}
                 </Text>
                 <FormLayout>
                   <Checkbox
-                    label="Set start date"
+                    label={t("reportForm.setStartDate")}
                     checked={useValidFrom}
                     onChange={setUseValidFrom}
                   />
                   {useValidFrom && (
                     <TextField
-                      label="Start Date"
+                      label={t("reportForm.startDate")}
                       type="date"
                       value={validFrom}
                       onChange={setValidFrom}
@@ -270,13 +277,13 @@ export default function EditReport() {
                     />
                   )}
                   <Checkbox
-                    label="Set end date"
+                    label={t("reportForm.setEndDate")}
                     checked={useValidUntil}
                     onChange={setUseValidUntil}
                   />
                   {useValidUntil && (
                     <TextField
-                      label="End Date"
+                      label={t("reportForm.endDate")}
                       type="date"
                       value={validUntil}
                       onChange={setValidUntil}
@@ -290,10 +297,10 @@ export default function EditReport() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Slack Destination
+                  {t("reportForm.slackDestination")}
                 </Text>
                 <TextField
-                  label="Slack Webhook URL"
+                  label={t("reportForm.slackWebhookUrl")}
                   value={slackWebhookUrl}
                   onChange={setSlackWebhookUrl}
                   placeholder="https://hooks.slack.com/services/..."
@@ -305,10 +312,10 @@ export default function EditReport() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Status
+                  {t("reportForm.statusLabel")}
                 </Text>
                 <Checkbox
-                  label="Active"
+                  label={t("reportForm.activeLabel")}
                   checked={isActive}
                   onChange={setIsActive}
                 />
@@ -319,7 +326,7 @@ export default function EditReport() {
               <Card>
                 <BlockStack gap="400">
                   <Text as="h2" variant="headingMd">
-                    Recent Logs
+                    {t("reportForm.recentLogs")}
                   </Text>
                   {config.reports.map((log) => (
                     <InlineStack key={log.id} gap="300">
@@ -331,7 +338,9 @@ export default function EditReport() {
                         {log.status}
                       </Badge>
                       <Text as="span" variant="bodyMd">
-                        {new Date(log.createdAt).toLocaleString("ja-JP")} -
+                        {new Date(log.createdAt).toLocaleString(
+                          locale === "ja" ? "ja-JP" : "en-US",
+                        )} -
                         {log.sentTo}
                       </Text>
                       {log.errorMsg && (
@@ -357,11 +366,11 @@ export default function EditReport() {
                   navigate(`/app/reports/${config.id}/preview`)
                 }
               >
-                Preview
+                {t("common.preview")}
               </Button>
-              <Button onClick={() => navigate("/app")}>Cancel</Button>
+              <Button onClick={() => navigate("/app")}>{t("common.cancel")}</Button>
               <Button variant="primary" onClick={handleSubmit}>
-                Save
+                {t("common.save")}
               </Button>
             </InlineStack>
           </BlockStack>

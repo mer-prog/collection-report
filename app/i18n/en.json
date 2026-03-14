@@ -1,0 +1,105 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "preview": "Preview",
+    "reports": "Reports",
+    "noLimit": "No limit"
+  },
+  "nav": {
+    "reports": "Reports"
+  },
+  "languageToggle": {
+    "label": "Language"
+  },
+  "dashboard": {
+    "title": "Collection Reports",
+    "newReport": "New Report",
+    "emptyHeading": "No reports configured",
+    "emptyDescription": "Set up automated collection reports to send to Slack.",
+    "createReport": "Create Report",
+    "sendNow": "Send Now",
+    "sendSuccess": "Report sent successfully!",
+    "deleteSuccess": "Report deleted",
+    "resourceSingular": "report",
+    "resourcePlural": "reports",
+    "headingCollection": "Collection",
+    "headingStatus": "Status",
+    "headingSchedule": "Schedule",
+    "headingPeriod": "Period",
+    "headingLastSent": "Last Sent",
+    "headingActions": "Actions"
+  },
+  "status": {
+    "active": "Active",
+    "pending": "Pending",
+    "expired": "Expired",
+    "inactive": "Inactive"
+  },
+  "schedule": {
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly",
+    "frequency": "Frequency",
+    "dayOfWeek": "Day of Week",
+    "dayOfMonth": "Day of Month",
+    "sendTime": "Send Time",
+    "sunday": "Sunday",
+    "monday": "Monday",
+    "tuesday": "Tuesday",
+    "wednesday": "Wednesday",
+    "thursday": "Thursday",
+    "friday": "Friday",
+    "saturday": "Saturday",
+    "weeklyFormat": "Weekly ({{day}})",
+    "monthlyFormat": "Monthly ({{day}}th)",
+    "dayAbbreviations": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  },
+  "reportForm": {
+    "collection": "Collection",
+    "selectCollection": "Select Collection",
+    "changeCollection": "Change Collection",
+    "schedule": "Schedule",
+    "validityPeriod": "Validity Period",
+    "validityPeriodOptional": "Validity Period (Optional)",
+    "setStartDate": "Set start date",
+    "startDate": "Start Date",
+    "setEndDate": "Set end date",
+    "endDate": "End Date",
+    "slackDestination": "Slack Destination",
+    "slackWebhookUrl": "Slack Webhook URL",
+    "statusLabel": "Status",
+    "activeLabel": "Active",
+    "recentLogs": "Recent Logs"
+  },
+  "newReport": {
+    "title": "New Report",
+    "createReport": "Create Report"
+  },
+  "editReport": {
+    "title": "Edit Report",
+    "editPrefix": "Edit: "
+  },
+  "previewReport": {
+    "title": "Report Preview",
+    "backToEdit": "Edit Report",
+    "slackPreviewTitle": "Slack Message Preview",
+    "slackPreviewDescription": "This is how the report will appear in Slack.",
+    "collectionReportTitle": "Collection Report: {{title}}",
+    "period": "Period",
+    "totalRevenue": "Total Revenue",
+    "orders": "Orders",
+    "avgOrderValue": "Avg Order Value",
+    "topProducts": "Top Products",
+    "units": "units",
+    "stock": "Stock: ",
+    "lowStockAlert": "Low Stock Alert",
+    "lowBadge": "Low",
+    "remaining": "{{count}} remaining"
+  },
+  "errors": {
+    "selectCollection": "Please select a collection",
+    "configureSchedule": "Please configure schedule settings"
+  }
+}

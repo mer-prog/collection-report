@@ -29,6 +29,8 @@ import prisma from "../db.server";
 import { getReportStatus } from "../services/scheduler.server";
 import { generateReport } from "../services/report-generator.server";
 import { sendSlackReport } from "../services/slack-sender.server";
+import { useTranslation, useTranslationArray } from "../i18n/i18nContext";
+import { LanguageToggle } from "../i18n/LanguageToggle";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -150,32 +152,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 type StatusTone = "success" | "info" | "warning" | "critical" | undefined;
 
-function statusBadge(status: string) {
-  const map: Record<string, { label: string; tone: StatusTone }> = {
-    active: { label: "Active", tone: "success" },
-    pending: { label: "Pending", tone: "info" },
-    expired: { label: "Expired", tone: "warning" },
-    inactive: { label: "Inactive", tone: "critical" },
+function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
+  const toneMap: Record<string, StatusTone> = {
+    active: "success",
+    pending: "info",
+    expired: "warning",
+    inactive: "critical",
   };
-  const { label, tone } = map[status] ?? {
-    label: status,
-    tone: undefined,
-  };
+  const tone = toneMap[status] ?? undefined;
+  const label = t(`status.${status}`);
   return <Badge tone={tone}>{label}</Badge>;
 }
 
-function scheduleLabel(schedule: string, day: number | null) {
+function ScheduleLabel({ schedule, day }: { schedule: string; day: number | null }) {
+  const { t } = useTranslation();
+  const dayAbbreviations = useTranslationArray("schedule.dayAbbreviations");
+
   switch (schedule) {
     case "daily":
-      return "Daily";
-    case "weekly": {
-      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      return `Weekly (${days[day ?? 0]})`;
-    }
+      return <>{t("schedule.daily")}</>;
+    case "weekly":
+      return <>{t("schedule.weeklyFormat", { day: dayAbbreviations[day ?? 0] })}</>;
     case "monthly":
-      return `Monthly (${day}th)`;
+      return <>{t("schedule.monthlyFormat", { day: String(day ?? 1) })}</>;
     default:
-      return schedule;
+      return <>{schedule}</>;
   }
 }
 
@@ -184,18 +186,19 @@ export default function Dashboard() {
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   const submit = useSubmit();
+  const { t, locale } = useTranslation();
 
   useEffect(() => {
     if (actionData && "error" in actionData) {
       shopify.toast.show(actionData.error as string, { isError: true });
     }
     if (actionData && "success" in actionData) {
-      shopify.toast.show("Report sent successfully!");
+      shopify.toast.show(t("dashboard.sendSuccess"));
     }
     if (actionData && "deleted" in actionData) {
-      shopify.toast.show("Report deleted");
+      shopify.toast.show(t("dashboard.deleteSuccess"));
     }
-  }, [actionData]);
+  }, [actionData, t]);
 
   const handleSendNow = (configId: string) => {
     submit({ intent: "sendNow", configId }, { method: "post" });
@@ -206,8 +209,8 @@ export default function Dashboard() {
   };
 
   const resourceName = {
-    singular: "report",
-    plural: "reports",
+    singular: t("dashboard.resourceSingular"),
+    plural: t("dashboard.resourcePlural"),
   };
 
   const rowMarkup = reports.map((report, index) => (
@@ -223,19 +226,21 @@ export default function Dashboard() {
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        {statusBadge(report.status)}
+        <StatusBadge status={report.status} />
       </IndexTable.Cell>
       <IndexTable.Cell>
-        {scheduleLabel(report.schedule, report.scheduleDay)} {report.scheduleTime}
+        <ScheduleLabel schedule={report.schedule} day={report.scheduleDay} /> {report.scheduleTime}
       </IndexTable.Cell>
       <IndexTable.Cell>
         {report.validFrom
           ? `${report.validFrom.split("T")[0]} ~ ${report.validUntil?.split("T")[0] ?? ""}`
-          : "No limit"}
+          : t("common.noLimit")}
       </IndexTable.Cell>
       <IndexTable.Cell>
         {report.lastSentAt
-          ? new Date(report.lastSentAt).toLocaleString("ja-JP")
+          ? new Date(report.lastSentAt).toLocaleString(
+              locale === "ja" ? "ja-JP" : "en-US",
+            )
           : "-"}
       </IndexTable.Cell>
       <IndexTable.Cell>
@@ -244,14 +249,14 @@ export default function Dashboard() {
             size="slim"
             onClick={() => handleSendNow(report.id)}
           >
-            Send Now
+            {t("dashboard.sendNow")}
           </Button>
           <Button
             size="slim"
             tone="critical"
             onClick={() => handleDelete(report.id)}
           >
-            Delete
+            {t("common.delete")}
           </Button>
         </InlineStack>
       </IndexTable.Cell>
@@ -260,50 +265,55 @@ export default function Dashboard() {
 
   return (
     <Page>
-      <TitleBar title="Collection Reports">
+      <TitleBar title={t("dashboard.title")}>
         <button
           variant="primary"
           onClick={() => navigate("/app/reports/new")}
         >
-          New Report
+          {t("dashboard.newReport")}
         </button>
       </TitleBar>
       <Layout>
         <Layout.Section>
-          <Card padding="0">
-            {reports.length === 0 ? (
-              <EmptyState
-                heading="No reports configured"
-                action={{
-                  content: "Create Report",
-                  onAction: () => navigate("/app/reports/new"),
-                }}
-                image=""
-              >
-                <p>
-                  Set up automated collection reports to send to Slack.
-                </p>
-              </EmptyState>
-            ) : (
-              <BlockStack>
-                <IndexTable
-                  resourceName={resourceName}
-                  itemCount={reports.length}
-                  headings={[
-                    { title: "Collection" },
-                    { title: "Status" },
-                    { title: "Schedule" },
-                    { title: "Period" },
-                    { title: "Last Sent" },
-                    { title: "Actions" },
-                  ]}
-                  selectable={false}
+          <BlockStack gap="400">
+            <InlineStack align="end">
+              <LanguageToggle />
+            </InlineStack>
+            <Card padding="0">
+              {reports.length === 0 ? (
+                <EmptyState
+                  heading={t("dashboard.emptyHeading")}
+                  action={{
+                    content: t("dashboard.createReport"),
+                    onAction: () => navigate("/app/reports/new"),
+                  }}
+                  image=""
                 >
-                  {rowMarkup}
-                </IndexTable>
-              </BlockStack>
-            )}
-          </Card>
+                  <p>
+                    {t("dashboard.emptyDescription")}
+                  </p>
+                </EmptyState>
+              ) : (
+                <BlockStack>
+                  <IndexTable
+                    resourceName={resourceName}
+                    itemCount={reports.length}
+                    headings={[
+                      { title: t("dashboard.headingCollection") },
+                      { title: t("dashboard.headingStatus") },
+                      { title: t("dashboard.headingSchedule") },
+                      { title: t("dashboard.headingPeriod") },
+                      { title: t("dashboard.headingLastSent") },
+                      { title: t("dashboard.headingActions") },
+                    ]}
+                    selectable={false}
+                  >
+                    {rowMarkup}
+                  </IndexTable>
+                </BlockStack>
+              )}
+            </Card>
+          </BlockStack>
         </Layout.Section>
       </Layout>
     </Page>

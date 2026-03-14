@@ -1,0 +1,105 @@
+{
+  "common": {
+    "cancel": "キャンセル",
+    "save": "保存",
+    "delete": "削除",
+    "preview": "プレビュー",
+    "reports": "レポート",
+    "noLimit": "制限なし"
+  },
+  "nav": {
+    "reports": "レポート"
+  },
+  "languageToggle": {
+    "label": "言語"
+  },
+  "dashboard": {
+    "title": "コレクションレポート",
+    "newReport": "新規レポート作成",
+    "emptyHeading": "レポートが設定されていません",
+    "emptyDescription": "Slackへ自動送信するコレクションレポートを設定しましょう。",
+    "createReport": "レポートを作成",
+    "sendNow": "今すぐ送信",
+    "sendSuccess": "レポートを送信しました！",
+    "deleteSuccess": "レポートを削除しました",
+    "resourceSingular": "レポート",
+    "resourcePlural": "レポート",
+    "headingCollection": "コレクション",
+    "headingStatus": "ステータス",
+    "headingSchedule": "スケジュール",
+    "headingPeriod": "連携期間",
+    "headingLastSent": "最終送信日時",
+    "headingActions": "アクション"
+  },
+  "status": {
+    "active": "稼働中",
+    "pending": "開始待ち",
+    "expired": "期間終了",
+    "inactive": "無効"
+  },
+  "schedule": {
+    "daily": "毎日",
+    "weekly": "毎週",
+    "monthly": "毎月",
+    "frequency": "頻度",
+    "dayOfWeek": "曜日",
+    "dayOfMonth": "日付",
+    "sendTime": "送信時刻",
+    "sunday": "日曜日",
+    "monday": "月曜日",
+    "tuesday": "火曜日",
+    "wednesday": "水曜日",
+    "thursday": "木曜日",
+    "friday": "金曜日",
+    "saturday": "土曜日",
+    "weeklyFormat": "毎週 ({{day}})",
+    "monthlyFormat": "毎月 ({{day}}日)",
+    "dayAbbreviations": ["日", "月", "火", "水", "木", "金", "土"]
+  },
+  "reportForm": {
+    "collection": "コレクション",
+    "selectCollection": "コレクションを選択",
+    "changeCollection": "コレクションを変更",
+    "schedule": "スケジュール",
+    "validityPeriod": "連携期間",
+    "validityPeriodOptional": "連携期間（任意）",
+    "setStartDate": "開始日を設定",
+    "startDate": "開始日",
+    "setEndDate": "終了日を設定",
+    "endDate": "終了日",
+    "slackDestination": "Slack送信先",
+    "slackWebhookUrl": "Slack Webhook URL",
+    "statusLabel": "ステータス",
+    "activeLabel": "有効",
+    "recentLogs": "最近のログ"
+  },
+  "newReport": {
+    "title": "新規レポート",
+    "createReport": "レポートを作成"
+  },
+  "editReport": {
+    "title": "レポート編集",
+    "editPrefix": "編集: "
+  },
+  "previewReport": {
+    "title": "レポートプレビュー",
+    "backToEdit": "レポート編集",
+    "slackPreviewTitle": "Slackメッセージプレビュー",
+    "slackPreviewDescription": "このレポートがSlackに表示される内容です。",
+    "collectionReportTitle": "コレクションレポート: {{title}}",
+    "period": "期間",
+    "totalRevenue": "売上合計",
+    "orders": "注文件数",
+    "avgOrderValue": "平均注文額",
+    "topProducts": "売上上位商品",
+    "units": "個",
+    "stock": "在庫: ",
+    "lowStockAlert": "在庫少アラート",
+    "lowBadge": "少",
+    "remaining": "{{count}}個 残り"
+  },
+  "errors": {
+    "selectCollection": "コレクションを選択してください",
+    "configureSchedule": "スケジュールを設定してください"
+  }
+}

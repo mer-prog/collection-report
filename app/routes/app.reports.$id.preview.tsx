@@ -18,6 +18,8 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { generateReport } from "../services/report-generator.server";
 import type { CollectionReportData } from "../services/slack-sender.server";
+import { useTranslation } from "../i18n/i18nContext";
+import { LanguageToggle } from "../i18n/LanguageToggle";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
@@ -41,10 +43,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 function formatCurrency(amount: number): string {
-  return `¥${amount.toLocaleString("ja-JP")}`;
+  return `\u00a5${amount.toLocaleString("ja-JP")}`;
 }
 
 function ReportPreviewContent({ data }: { data: CollectionReportData }) {
+  const { t } = useTranslation();
+
   return (
     <BlockStack gap="400">
       <Box
@@ -54,13 +58,13 @@ function ReportPreviewContent({ data }: { data: CollectionReportData }) {
       >
         <BlockStack gap="400">
           <Text as="h2" variant="headingLg">
-            Collection Report: {data.collectionTitle}
+            {t("previewReport.collectionReportTitle", { title: data.collectionTitle })}
           </Text>
 
           <InlineStack gap="800">
             <BlockStack gap="100">
               <Text as="span" variant="bodySm" tone="subdued">
-                Period
+                {t("previewReport.period")}
               </Text>
               <Text as="span" variant="bodyMd">
                 {data.period.from} - {data.period.to}
@@ -68,7 +72,7 @@ function ReportPreviewContent({ data }: { data: CollectionReportData }) {
             </BlockStack>
             <BlockStack gap="100">
               <Text as="span" variant="bodySm" tone="subdued">
-                Total Revenue
+                {t("previewReport.totalRevenue")}
               </Text>
               <Text as="span" variant="headingMd">
                 {formatCurrency(data.summary.totalRevenue)}
@@ -76,7 +80,7 @@ function ReportPreviewContent({ data }: { data: CollectionReportData }) {
             </BlockStack>
             <BlockStack gap="100">
               <Text as="span" variant="bodySm" tone="subdued">
-                Orders
+                {t("previewReport.orders")}
               </Text>
               <Text as="span" variant="headingMd">
                 {data.summary.totalOrders}
@@ -84,7 +88,7 @@ function ReportPreviewContent({ data }: { data: CollectionReportData }) {
             </BlockStack>
             <BlockStack gap="100">
               <Text as="span" variant="bodySm" tone="subdued">
-                Avg Order Value
+                {t("previewReport.avgOrderValue")}
               </Text>
               <Text as="span" variant="headingMd">
                 {formatCurrency(data.summary.averageOrderValue)}
@@ -97,7 +101,7 @@ function ReportPreviewContent({ data }: { data: CollectionReportData }) {
           {data.topProducts.length > 0 && (
             <BlockStack gap="200">
               <Text as="h3" variant="headingMd">
-                Top Products
+                {t("previewReport.topProducts")}
               </Text>
               {data.topProducts.slice(0, 3).map((product, i) => (
                 <InlineStack key={i} gap="300" blockAlign="center">
@@ -106,10 +110,10 @@ function ReportPreviewContent({ data }: { data: CollectionReportData }) {
                     {product.title}
                   </Text>
                   <Text as="span" variant="bodyMd">
-                    {product.unitsSold} units / {formatCurrency(product.revenue)}
+                    {product.unitsSold} {t("previewReport.units")} / {formatCurrency(product.revenue)}
                   </Text>
                   <Text as="span" variant="bodySm" tone="subdued">
-                    Stock: {product.currentInventory}
+                    {t("previewReport.stock")}{product.currentInventory}
                   </Text>
                 </InlineStack>
               ))}
@@ -121,16 +125,16 @@ function ReportPreviewContent({ data }: { data: CollectionReportData }) {
               <Divider />
               <BlockStack gap="200">
                 <Text as="h3" variant="headingMd">
-                  Low Stock Alert
+                  {t("previewReport.lowStockAlert")}
                 </Text>
                 {data.lowStockProducts.map((product, i) => (
                   <InlineStack key={i} gap="300">
-                    <Badge tone="warning">Low</Badge>
+                    <Badge tone="warning">{t("previewReport.lowBadge")}</Badge>
                     <Text as="span" variant="bodyMd">
                       {product.title} ({product.variantTitle})
                     </Text>
                     <Text as="span" variant="bodyMd" tone="critical">
-                      {product.currentInventory} remaining
+                      {t("previewReport.remaining", { count: product.currentInventory })}
                     </Text>
                   </InlineStack>
                 ))}
@@ -146,29 +150,35 @@ function ReportPreviewContent({ data }: { data: CollectionReportData }) {
 export default function PreviewReport() {
   const { reportData, configId } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <Page
       backAction={{
-        content: "Edit Report",
+        content: t("previewReport.backToEdit"),
         onAction: () => navigate(`/app/reports/${configId}`),
       }}
-      title="Report Preview"
+      title={t("previewReport.title")}
     >
-      <TitleBar title="Report Preview" />
+      <TitleBar title={t("previewReport.title")} />
       <Layout>
         <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Slack Message Preview
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                This is how the report will appear in Slack.
-              </Text>
-              <ReportPreviewContent data={reportData} />
-            </BlockStack>
-          </Card>
+          <BlockStack gap="400">
+            <InlineStack align="end">
+              <LanguageToggle />
+            </InlineStack>
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h2" variant="headingMd">
+                  {t("previewReport.slackPreviewTitle")}
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {t("previewReport.slackPreviewDescription")}
+                </Text>
+                <ReportPreviewContent data={reportData} />
+              </BlockStack>
+            </Card>
+          </BlockStack>
         </Layout.Section>
       </Layout>
     </Page>

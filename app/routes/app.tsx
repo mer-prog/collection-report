@@ -6,6 +6,7 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
+import { I18nProvider } from "../i18n/i18nContext";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -15,17 +16,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
 
+function NavMenuContent() {
+  // NavMenu is rendered inside I18nProvider but we cannot use hooks here
+  // because NavMenu children must be plain Link elements.
+  // The nav label is static; the rest of the app uses t().
+  return (
+    <NavMenu>
+      <Link to="/app" rel="home">
+        Reports
+      </Link>
+    </NavMenu>
+  );
+}
+
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
-      <NavMenu>
-        <Link to="/app" rel="home">
-          Reports
-        </Link>
-      </NavMenu>
-      <Outlet />
+      <I18nProvider defaultLocale="ja">
+        <NavMenuContent />
+        <Outlet />
+      </I18nProvider>
     </AppProvider>
   );
 }

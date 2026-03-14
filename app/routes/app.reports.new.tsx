@@ -19,6 +19,8 @@ import { TitleBar } from "@shopify/app-bridge-react";
 
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { useTranslation } from "../i18n/i18nContext";
+import { LanguageToggle } from "../i18n/LanguageToggle";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -68,26 +70,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return redirect("/app");
 };
 
-const SCHEDULE_OPTIONS = [
-  { label: "Daily", value: "daily" },
-  { label: "Weekly", value: "weekly" },
-  { label: "Monthly", value: "monthly" },
-];
-
-const DAY_OF_WEEK_OPTIONS = [
-  { label: "Sunday", value: "0" },
-  { label: "Monday", value: "1" },
-  { label: "Tuesday", value: "2" },
-  { label: "Wednesday", value: "3" },
-  { label: "Thursday", value: "4" },
-  { label: "Friday", value: "5" },
-  { label: "Saturday", value: "6" },
-];
-
 export default function NewReport() {
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   const submit = useSubmit();
+  const { t } = useTranslation();
 
   const [collectionId, setCollectionId] = useState("");
   const [collectionTitle, setCollectionTitle] = useState("");
@@ -99,6 +86,22 @@ export default function NewReport() {
   const [useValidUntil, setUseValidUntil] = useState(false);
   const [validFrom, setValidFrom] = useState("");
   const [validUntil, setValidUntil] = useState("");
+
+  const scheduleOptions = [
+    { label: t("schedule.daily"), value: "daily" },
+    { label: t("schedule.weekly"), value: "weekly" },
+    { label: t("schedule.monthly"), value: "monthly" },
+  ];
+
+  const dayOfWeekOptions = [
+    { label: t("schedule.sunday"), value: "0" },
+    { label: t("schedule.monday"), value: "1" },
+    { label: t("schedule.tuesday"), value: "2" },
+    { label: t("schedule.wednesday"), value: "3" },
+    { label: t("schedule.thursday"), value: "4" },
+    { label: t("schedule.friday"), value: "5" },
+    { label: t("schedule.saturday"), value: "6" },
+  ];
 
   const handleCollectionPicker = useCallback(async () => {
     const selection = await shopify.resourcePicker({
@@ -134,21 +137,25 @@ export default function NewReport() {
 
   return (
     <Page
-      backAction={{ content: "Reports", onAction: () => navigate("/app") }}
-      title="New Report"
+      backAction={{ content: t("common.reports"), onAction: () => navigate("/app") }}
+      title={t("newReport.title")}
     >
-      <TitleBar title="New Report" />
+      <TitleBar title={t("newReport.title")} />
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
+            <InlineStack align="end">
+              <LanguageToggle />
+            </InlineStack>
+
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Collection
+                  {t("reportForm.collection")}
                 </Text>
                 <InlineStack gap="300" blockAlign="center">
                   <Button onClick={handleCollectionPicker}>
-                    {collectionTitle || "Select Collection"}
+                    {collectionTitle || t("reportForm.selectCollection")}
                   </Button>
                   {collectionTitle && (
                     <Text as="span" variant="bodyMd">
@@ -167,26 +174,26 @@ export default function NewReport() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Schedule
+                  {t("reportForm.schedule")}
                 </Text>
                 <FormLayout>
                   <Select
-                    label="Frequency"
-                    options={SCHEDULE_OPTIONS}
+                    label={t("schedule.frequency")}
+                    options={scheduleOptions}
                     value={schedule}
                     onChange={setSchedule}
                   />
                   {schedule === "weekly" && (
                     <Select
-                      label="Day of Week"
-                      options={DAY_OF_WEEK_OPTIONS}
+                      label={t("schedule.dayOfWeek")}
+                      options={dayOfWeekOptions}
                       value={scheduleDay}
                       onChange={setScheduleDay}
                     />
                   )}
                   {schedule === "monthly" && (
                     <TextField
-                      label="Day of Month"
+                      label={t("schedule.dayOfMonth")}
                       type="number"
                       value={scheduleDay}
                       onChange={setScheduleDay}
@@ -196,7 +203,7 @@ export default function NewReport() {
                     />
                   )}
                   <TextField
-                    label="Send Time"
+                    label={t("schedule.sendTime")}
                     type="time"
                     value={scheduleTime}
                     onChange={setScheduleTime}
@@ -209,17 +216,17 @@ export default function NewReport() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Validity Period (Optional)
+                  {t("reportForm.validityPeriodOptional")}
                 </Text>
                 <FormLayout>
                   <Checkbox
-                    label="Set start date"
+                    label={t("reportForm.setStartDate")}
                     checked={useValidFrom}
                     onChange={setUseValidFrom}
                   />
                   {useValidFrom && (
                     <TextField
-                      label="Start Date"
+                      label={t("reportForm.startDate")}
                       type="date"
                       value={validFrom}
                       onChange={setValidFrom}
@@ -227,13 +234,13 @@ export default function NewReport() {
                     />
                   )}
                   <Checkbox
-                    label="Set end date"
+                    label={t("reportForm.setEndDate")}
                     checked={useValidUntil}
                     onChange={setUseValidUntil}
                   />
                   {useValidUntil && (
                     <TextField
-                      label="End Date"
+                      label={t("reportForm.endDate")}
                       type="date"
                       value={validUntil}
                       onChange={setValidUntil}
@@ -247,10 +254,10 @@ export default function NewReport() {
             <Card>
               <BlockStack gap="400">
                 <Text as="h2" variant="headingMd">
-                  Slack Destination
+                  {t("reportForm.slackDestination")}
                 </Text>
                 <TextField
-                  label="Slack Webhook URL"
+                  label={t("reportForm.slackWebhookUrl")}
                   value={slackWebhookUrl}
                   onChange={setSlackWebhookUrl}
                   placeholder="https://hooks.slack.com/services/..."
@@ -260,9 +267,9 @@ export default function NewReport() {
             </Card>
 
             <InlineStack align="end" gap="300">
-              <Button onClick={() => navigate("/app")}>Cancel</Button>
+              <Button onClick={() => navigate("/app")}>{t("common.cancel")}</Button>
               <Button variant="primary" onClick={handleSubmit}>
-                Create Report
+                {t("newReport.createReport")}
               </Button>
             </InlineStack>
           </BlockStack>

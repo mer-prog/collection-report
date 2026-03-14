@@ -32,3 +32,30 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+model ReportConfig {
+  id              String    @id @default(cuid())
+  shop            String
+  collectionId    String
+  collectionTitle String
+  schedule        String // daily | weekly | monthly
+  scheduleTime    String // "09:00"
+  scheduleDay     Int? // weekly: 0-6, monthly: 1-31
+  slackWebhookUrl String?
+  isActive        Boolean   @default(true)
+  validFrom       DateTime?
+  validUntil      DateTime?
+  lastSentAt      DateTime?
+  createdAt       DateTime  @default(now())
+  reports         ReportLog[]
+}
+
+model ReportLog {
+  id        String       @id @default(cuid())
+  configId  String
+  config    ReportConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  status    String // success | failed
+  sentTo    String // slack
+  errorMsg  String?
+  createdAt DateTime     @default(now())
+}
